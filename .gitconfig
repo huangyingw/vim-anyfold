@@ -1,0 +1,12 @@
+[remote "pseewald"]
+	url = https://github.com/pseewald/vim-anyfold.git
+    fetch = +refs/heads/*:refs/remotes/pseewald/*
+[remote "github"]
+    url = git@github.com:huangyingw/vim-anyfold.git
+    fetch = +refs/heads/*:refs/remotes/github/*
+[push]
+    remote = origin
+    remote = github
+[gsync]
+    remote = pseewald
+    branch = master
