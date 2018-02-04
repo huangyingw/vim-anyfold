@@ -1,3 +1,4 @@
+au BufNewFile,BufRead * call anyfold#reinit()
 if exists("b:loaded_anyfold")
     finish
 endif

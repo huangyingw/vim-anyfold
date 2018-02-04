@@ -6,13 +6,6 @@ function! anyfold#reinit() abort
         unlet b:anyfold_initialised
     endif
     
-    if exists("b:anyfold_commentlines")
-        if islocked(b:anyfold_commentlines)
-            unlockvar! b:anyfold_commentlines
-        endif
-    endif
-    
-    call anyfold#init()
 endfunction
 function! anyfold#init() abort
 
@@ -226,12 +219,16 @@ endfunction
 function! s:InitIndentList() abort
 
     if g:anyfold_identify_comments
+        unlockvar! b:anyfold_commentlines
         let b:anyfold_commentlines = s:MarkCommentLines(1, line('$'))
         lockvar! b:anyfold_commentlines
     endif
 
+    unlockvar! b:anyfold_ind_actual
     let b:anyfold_ind_actual = s:ActualIndents(1, line('$'))
+    unlockvar! b:anyfold_ind_contextual
     let b:anyfold_ind_contextual = s:ContextualIndents(0, 1, line('$'), b:anyfold_ind_actual)
+    unlockvar! b:anyfold_ind_buffer
     let b:anyfold_ind_buffer = s:BufferIndents(1, line('$'))
 
     lockvar! b:anyfold_ind_buffer
