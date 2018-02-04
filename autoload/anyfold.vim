@@ -1,12 +1,12 @@
-"----------------------------------------------------------------------------/
-" Initialization: Activation of requested features
-"----------------------------------------------------------------------------/
-function! anyfold#reinit() abort
+function! anyfold#reset() abort
     if exists("b:anyfold_initialised")
         unlet b:anyfold_initialised
     endif
-    
+
 endfunction
+"----------------------------------------------------------------------------/
+" Initialization: Activation of requested features
+"----------------------------------------------------------------------------/
 function! anyfold#init() abort
 
     if exists("g:anyfold_activate")
@@ -143,7 +143,7 @@ function! s:CommentLine(lnum, force) abort
         return 0
     else
         return synIDattr(synID(a:lnum,indent(a:lnum)+1,1),"name") =~? 'comment\|string'
-               \ || getline(a:lnum)[0] == '#'
+                    \ || getline(a:lnum)[0] == '#'
     endif
 endfunction
 
