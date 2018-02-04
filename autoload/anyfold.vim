@@ -1,6 +1,19 @@
 "----------------------------------------------------------------------------/
 " Initialization: Activation of requested features
 "----------------------------------------------------------------------------/
+function! anyfold#reinit() abort
+    if exists("b:anyfold_initialised")
+        unlet b:anyfold_initialised
+    endif
+    
+    if exists("b:anyfold_commentlines")
+        if islocked(b:anyfold_commentlines)
+            unlockvar! b:anyfold_commentlines
+        endif
+    endif
+    
+    call anyfold#init()
+endfunction
 function! anyfold#init() abort
 
     if exists("g:anyfold_activate")
