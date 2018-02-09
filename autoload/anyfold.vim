@@ -2,7 +2,6 @@ function! anyfold#reset() abort
     if exists("b:anyfold_initialised")
         unlet b:anyfold_initialised
     endif
-
 endfunction
 "----------------------------------------------------------------------------/
 " Initialization: Activation of requested features
