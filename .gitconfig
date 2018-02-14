@@ -1,5 +1,5 @@
 [remote "pseewald"]
-	url = https://github.com/pseewald/vim-anyfold.git
+    url = https://github.com/pseewald/vim-anyfold.git
     fetch = +refs/heads/*:refs/remotes/pseewald/*
 [remote "github"]
     url = git@github.com:huangyingw/vim-anyfold.git
@@ -11,4 +11,7 @@
     remote = pseewald
     branch = master
 [commit]
-	message = n
+    message = n
+[branch "dev.fix"]
+    remote = origin
+    merge = refs/heads/dev.fix
