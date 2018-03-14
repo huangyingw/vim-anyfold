@@ -3,6 +3,7 @@ function! anyfold#reset() abort
         unlet b:anyfold_initialised
     endif
 endfunction
+
 "----------------------------------------------------------------------------/
 " Initialization: Activation of requested features
 "----------------------------------------------------------------------------/
@@ -103,11 +104,11 @@ function! anyfold#init() abort
 
     " mappings for debugging
     if g:anyfold_debug
-        noremap <script> <buffer> <silent> <F10>
+        noremap <script> <buffer> <silent> <F8>
                     \ :call <SID>EchoIndents(1)<cr>
-        noremap <script> <buffer> <silent> <F11>
+        noremap <script> <buffer> <silent> <F9>
                     \ :call <SID>EchoIndents(2)<cr>
-        noremap <script> <buffer> <silent> <F12>
+        noremap <script> <buffer> <silent> <F10>
                     \ :call <SID>EchoIndents(3)<cr>
     endif
 
@@ -117,41 +118,47 @@ endfunction
 "----------------------------------------------------------------------------/
 " Identify comment lines
 "----------------------------------------------------------------------------/
-function! s:MarkCommentLines(line_start, line_end, force) abort
+function! s:MarkCommentLines(line_start, line_end) abort
     let commentlines = []
     let curr_line = a:line_start
     while curr_line <= a:line_end
-        " here we force identification of a comment line if it may belong to a
-        " multiline comment (in this case we can not assume that it is
-        " unindented)
-        let force = a:force
-        if force == 0
-            if curr_line > a:line_start
-                let force = commentlines[-1]
-            else
-                let force = 1
-            endif
-        endif
-        let commentlines += [0]
-        if s:CommentLine(curr_line, force)
-            let commentlines[-1] = 1
-        endif
+        let commentlines += [s:CommentLine(curr_line)]
         let curr_line += 1
     endwhile
     return commentlines
 endfunction
 
 "----------------------------------------------------------------------------/
-" Check if line is unindented comment or preprocessor statement
-" Note: synID is very slow, therefore we identify unindented comments only
-" (or if force==1)
+" Check if line is comment or preprocessor statement
 "----------------------------------------------------------------------------/
-function! s:CommentLine(lnum, force) abort
-    if (indent(a:lnum) >= &sw && !a:force) || len(s:comments_string) == 0
+function! s:CommentLine(lnum) abort
+    if getline(a:lnum) !~? '\v\S'
+        " empty line
         return 0
-    else
+    endif
+
+    if g:anyfold_identify_comments == 0
+        return 0
+    endif
+
+    if g:anyfold_identify_comments >= 1
+        " using foldignore option to detect comments
+        " note: this may not work for multiline comments
+        for char in split(&foldignore, '\zs')
+            if char ==? getline(a:lnum)[indent(a:lnum)]
+                return 1
+            endif
+        endfor
+    endif
+
+    if g:anyfold_identify_comments >= 2
+        " synID is very slow, therefore we only call this if user wants highest
+        " accuracy for comment identification
         return synIDattr(synID(a:lnum,indent(a:lnum)+1,1),"name") =~? s:comments_string
     endif
+
+    return 0
+
 endfunction
 
 "----------------------------------------------------------------------------/
@@ -171,17 +178,17 @@ endfunction
 
 "----------------------------------------------------------------------------/
 " Utility function to check if line is to be considered
-" Note: this implements good heuristics for braces
 "----------------------------------------------------------------------------/
 function! s:ConsiderLine(lnum) abort
     if getline(a:lnum) !~? '\v\S'
         " empty line
         return 0
-    elseif getline(a:lnum) =~? '^\s*\W\s*$'
-        " line containing brace only
+    elseif getline(a:lnum) =~? '^\W\+$'
+        " line containing braces or other non-word characters that will not
+        " define an indent
         return 0
     elseif s:IsComment(a:lnum)
-        " unindented comment line
+        " comment line
         return 0
     else
         return 1
@@ -226,9 +233,8 @@ endfunction
 function! s:InitIndentList() abort
 
     if g:anyfold_identify_comments
-        let force = g:anyfold_identify_comments == 2
         unlockvar! b:anyfold_commentlines
-        let b:anyfold_commentlines = s:MarkCommentLines(1, line('$'), force)
+        let b:anyfold_commentlines = s:MarkCommentLines(1, line('$'))
         lockvar! b:anyfold_commentlines
     endif
 
@@ -247,15 +253,47 @@ endfunction
 "----------------------------------------------------------------------------/
 " get actual indents
 " don't depend on context
+" Note: this implements good heuristics also for braces
 "----------------------------------------------------------------------------/
 function! s:ActualIndents(line_start, line_end) abort
-    let ind_list = []
     let curr_line = a:line_start
-    while curr_line <= a:line_end
-        let ind_list += [s:LineIndent(curr_line)]
-        let curr_line += 1
+    let offset = curr_line
+
+    " need to start with a line that has an indent
+    while curr_line > 1 && s:ConsiderLine(curr_line) == 0
+        let curr_line -= 1
     endwhile
-    return ind_list
+    let offset -= curr_line
+
+    let ind_list = [indent(curr_line)]
+    while curr_line < a:line_end
+        let curr_line += 1
+        let prev_indent = ind_list[-1]
+        let next_indent = indent(s:NextNonBlankLine(curr_line))
+        if s:ConsiderLine(curr_line)
+            " non-empty lines that define an indent
+            let ind_list += [indent(curr_line)]
+        elseif getline(curr_line) =~? '^\s*{\W*$'
+            " line consisting of { brace: this increases indent level
+            let ind_list += [min([ind_list[-1] + shiftwidth(), next_indent])]
+        elseif getline(curr_line) =~? '^\s*}\W*$'
+            " line consisting of } brace: this has indent of line with matching {
+            let restore = winsaveview()
+            execute curr_line
+            normal! %
+            let br_open_pos = getpos('.')[1]
+            call winrestview(restore)
+            if br_open_pos < curr_line && br_open_pos >= a:line_start - offset
+                let ind_list += [ind_list[offset + br_open_pos - a:line_start]]
+            else
+                " in case matching { does not exist or is out of range
+                let ind_list += [max([prev_indent, next_indent])]
+            endif
+        else
+            let ind_list += [max([prev_indent, next_indent])]
+        endif
+    endwhile
+    return ind_list[offset : ]
 endfunction
 
 "----------------------------------------------------------------------------/
@@ -389,6 +427,8 @@ endfunction
 "----------------------------------------------------------------------------/
 " Update folds
 " Only lines that have been changed are updated
+" Note: update mechanism may not always update brace based folds since it
+" detects block to be updated based on indents.
 "----------------------------------------------------------------------------/
 function! s:ReloadFolds() abort
 
@@ -416,11 +456,10 @@ function! s:ReloadFolds() abort
 
     " partially update comments
     if g:anyfold_identify_comments
-        let force = g:anyfold_identify_comments == 2
         unlockvar! b:anyfold_commentlines
         let b:anyfold_commentlines = s:ExtendLineList(b:anyfold_commentlines, changed[0], changed[1])
         if changed_lines > 0
-            let b:anyfold_commentlines[changed[0]-1 : changed[1]-1] = s:MarkCommentLines(changed[0], changed[1], force)
+            let b:anyfold_commentlines[changed[0]-1 : changed[1]-1] = s:MarkCommentLines(changed[0], changed[1])
         endif
         lockvar! b:anyfold_commentlines
     endif
