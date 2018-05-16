@@ -15,6 +15,3 @@
 [branch "dev"]
     remote = origin
     merge = refs/heads/dev
-[branch "dev.fix"]
-    remote = origin
-    merge = refs/heads/dev.fix
