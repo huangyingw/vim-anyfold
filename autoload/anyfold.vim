@@ -599,7 +599,7 @@ endfunction
 "----------------------------------------------------------------------------/
 " Improved fold display
 " Inspired by example code by Greg Sexton
-" http://gregsexton.org/2011/03/27/improving-the-text-displayed-in-a-vim-fold.html
+" http://www.gregsexton.org/2011/03/improving-the-text-displayed-in-a-fold/
 "----------------------------------------------------------------------------/
 function! MinimalFoldText() abort
     let fs = v:foldstart
