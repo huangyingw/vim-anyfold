@@ -26,7 +26,7 @@ function! anyfold#init() abort
         let b:anyfold_initialised = 1
     endif
 
-    let b:anyfold_disable = &diff || (&buftype ==# "terminal")
+    let b:anyfold_disable = &diff || (&buftype ==# "terminal")  || (&filetype ==# "gitcommit")
     if b:anyfold_disable
         return
     endif
