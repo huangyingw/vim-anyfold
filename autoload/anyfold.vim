@@ -1,22 +1,18 @@
-function! anyfold#reset() abort
-    if exists("b:anyfold_initialised")
-        unlet b:anyfold_initialised
-    endif
-endfunction
-
 "----------------------------------------------------------------------------/
 " Initialization: Activation of requested features
 "----------------------------------------------------------------------------/
-function! anyfold#init() abort
+function! anyfold#init(force) abort
 
     if exists("g:anyfold_activate")
         let b:anyfold_activate = g:anyfold_activate
     endif
 
-    if !exists("b:anyfold_activate")
-        return
-    elseif !b:anyfold_activate
-        return
+    if !a:force
+        if !exists("b:anyfold_activate")
+            return
+        elseif !b:anyfold_activate
+            return
+        endif
     endif
 
     " make sure initialisation only happens once
@@ -26,8 +22,15 @@ function! anyfold#init() abort
         let b:anyfold_initialised = 1
     endif
 
-    let b:anyfold_disable = &diff || (&buftype ==# "terminal")  || (&filetype ==# "gitcommit")
-    if b:anyfold_disable
+    if exists("b:anyfold_activate")
+        echoerr "anyfold: 'let anyfold_activate=1' is deprecated, replace by command ':AnyFoldActivate' (see ':h AnyFoldActivate')"
+    endif
+
+    if exists("b:AnyFoldActivate") || exists("g:AnyFoldActivate")
+        echoerr "anyfold: 'let AnyFoldActivate=1' does not work, ':AnyFoldActivate' is a command! (see ':h AnyFoldActivate')"
+    endif
+
+    if s:AnyfoldDisable()
         return
     endif
 
@@ -41,6 +44,8 @@ function! anyfold#init() abort
                     \ 'fold_display':                 1,
                     \ 'motion':                       1,
                     \ 'debug':                        0,
+                    \ 'fold_size_str':           '%s lines',
+                    \ 'fold_level_str':             ' + ',
                     \ }
         lockvar! g:_ANYFOLD_DEFAULTS
     endif
@@ -61,20 +66,21 @@ function! anyfold#init() abort
         let s:comments_string = join(g:anyfold_comments, "\\|")
     endif
 
-    " Create list with indents / foldlevels
+    " calculate indents for first time
     call s:InitIndentList()
 
-    " Set folds
-    setlocal foldmethod=expr
-    setlocal foldexpr=b:anyfold_ind_buffer[v:lnum-1]
-
-    " Fold display
-    if g:anyfold_fold_display
-        setlocal foldtext=MinimalFoldText()
-    endif
-
     " folds are always updated when buffer has changed
-    autocmd TextChanged,InsertLeave <buffer> :call s:ReloadFolds()
+    autocmd TextChanged,InsertLeave <buffer> call s:ReloadFolds()
+
+    " set vim options
+    call anyfold#set_options()
+
+    " for some events, options need to be set again:
+    " - foldexpr is local to current window so it needs update when
+    "   user enters another window (WinEnter).
+    " - reset foldmethod that may be overwritten by syntax files (BufNewFile, BufRead)
+    "   (see #15, this replaces pr #16)
+    autocmd WinEnter,BufNewFile,BufRead <buffer> call anyfold#set_options()
 
     if g:anyfold_motion
         noremap <script> <buffer> <silent> ]]
@@ -104,15 +110,35 @@ function! anyfold#init() abort
 
     " mappings for debugging
     if g:anyfold_debug
-        noremap <script> <buffer> <silent> <F8>
+        noremap <script> <buffer> <silent> <F7>
                     \ :call <SID>EchoIndents(1)<cr>
-        noremap <script> <buffer> <silent> <F9>
+        noremap <script> <buffer> <silent> <F8>
                     \ :call <SID>EchoIndents(2)<cr>
-        noremap <script> <buffer> <silent> <F10>
+        noremap <script> <buffer> <silent> <F9>
                     \ :call <SID>EchoIndents(3)<cr>
+        noremap <script> <buffer> <silent> <F10>
+                    \ :call <SID>EchoIndents(4)<cr>
     endif
 
     silent doautocmd User anyfoldLoaded
+
+endfunction
+
+"----------------------------------------------------------------------------/
+" Set fold related vim options needed for anyfold
+"----------------------------------------------------------------------------/
+function! anyfold#set_options() abort
+
+    if s:AnyfoldDisable()
+        return
+    endif
+
+    setlocal foldmethod=expr
+    set foldexpr=b:anyfold_ind_buffer[v:lnum-1]
+    if g:anyfold_fold_display
+        setlocal foldtext=MinimalFoldText()
+    endif
+
 endfunction
 
 "----------------------------------------------------------------------------/
@@ -233,16 +259,12 @@ endfunction
 function! s:InitIndentList() abort
 
     if g:anyfold_identify_comments
-        unlockvar! b:anyfold_commentlines
         let b:anyfold_commentlines = s:MarkCommentLines(1, line('$'))
         lockvar! b:anyfold_commentlines
     endif
 
-    unlockvar! b:anyfold_ind_actual
     let b:anyfold_ind_actual = s:ActualIndents(1, line('$'))
-    unlockvar! b:anyfold_ind_contextual
     let b:anyfold_ind_contextual = s:ContextualIndents(0, 1, line('$'), b:anyfold_ind_actual)
-    unlockvar! b:anyfold_ind_buffer
     let b:anyfold_ind_buffer = s:BufferIndents(1, line('$'))
 
     lockvar! b:anyfold_ind_buffer
@@ -436,6 +458,11 @@ function! s:ReloadFolds() abort
     " previously changed text '[ & '] are not always reliable, for instance if
     " text is inserted by a script. There may be vim bugs such as
     " vim/vim#1281.
+    "
+
+    " for some reason, need to redraw, otherwise vim will display
+    " beginning of file before jumping to last position
+    redraw
 
     let changed_start = min([getpos("'[")[1], line('$')])
     let changed_end = min([getpos("']")[1], line('$')])
@@ -569,7 +596,7 @@ function! s:ReloadFolds() abort
     lockvar! b:anyfold_ind_contextual
     lockvar! b:anyfold_ind_buffer
 
-    setlocal foldexpr=b:anyfold_ind_buffer[v:lnum-1]
+    set foldexpr=b:anyfold_ind_buffer[v:lnum-1]
 
 endfunction
 
@@ -601,6 +628,20 @@ function! s:ExtendLineList(list, insert_start, insert_end) abort
 endfunction
 
 "----------------------------------------------------------------------------/
+" disable fold text and return whether anyfold should be disabled
+"----------------------------------------------------------------------------/
+function! s:AnyfoldDisable() abort
+    if &diff || (&buftype ==# "terminal")
+        if &foldtext=="MinimalFoldText()"
+            setlocal foldtext=foldtext() " reset foldtext to default
+        endif
+        return 1
+    else
+        return 0
+    endif
+endfunction
+
+"----------------------------------------------------------------------------/
 " Improved fold display
 " Inspired by example code by Greg Sexton
 " http://gregsexton.org/2011/03/27/improving-the-text-displayed-in-a-vim-fold.html
@@ -618,8 +659,8 @@ function! MinimalFoldText() abort
 
     let w = winwidth(0) - &foldcolumn - &number * &numberwidth
     let foldSize = 1 + v:foldend - v:foldstart
-    let foldSizeStr = " " . foldSize . " lines "
-    let foldLevelStr = repeat("  +  ", v:foldlevel)
+    let foldSizeStr = " " . substitute(g:anyfold_fold_size_str, "%s", string(foldSize), "g") . " "
+    let foldLevelStr = repeat(g:anyfold_fold_level_str, v:foldlevel)
     let lineCount = line("$")
     let expansionString = repeat(" ", w - strwidth(foldSizeStr.line.foldLevelStr))
     return line . expansionString . foldSizeStr . foldLevelStr
@@ -724,5 +765,7 @@ function! s:EchoIndents(mode) abort
         echom b:anyfold_ind_actual[line('.')-1]
     elseif a:mode == 3
         echom b:anyfold_ind_contextual[line('.')-1]
+    elseif a:mode == 4
+        echom b:anyfold_ind_buffer[line('.')-1]
     endif
 endfunction
