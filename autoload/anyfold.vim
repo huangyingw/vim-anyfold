@@ -489,7 +489,7 @@ function! s:ReloadFolds() abort
     if g:anyfold_identify_comments
         unlockvar! b:anyfold_commentlines
         let b:anyfold_commentlines = s:ExtendLineList(b:anyfold_commentlines, changed[0], changed[1])
-        if changed_lines > 0 && changed[0] > 0 && changed[1] > 0
+        if changed_lines > 0
             let b:anyfold_commentlines[changed[0]-1 : changed[1]-1] = s:MarkCommentLines(changed[0], changed[1])
         endif
         lockvar! b:anyfold_commentlines
