@@ -8,7 +8,8 @@
     remote = origin
     remote = github
 [gsync]
-    remote = pseewald/master
+    remote = pseewald
+    branch = master
 [commit]
     message = n
 [branch "dev"]
