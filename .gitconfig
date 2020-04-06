@@ -15,3 +15,5 @@
 [branch "dev"]
     remote = origin
     merge = refs/heads/dev
+[gdif]
+    ignore = ./dev.gdio.diff
