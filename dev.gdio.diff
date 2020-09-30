@@ -1,7 +1,7 @@
-diff --git plugin/anyfold.vim plugin/anyfold.vim
+diff --git a/plugin/anyfold.vim b/plugin/anyfold.vim
 index ce2d072..e2c3bba 100644
---- plugin/anyfold.vim
-+++ plugin/anyfold.vim
+--- ./plugin/anyfold.vim
++++ ./plugin/anyfold.vim
 @@ -7,4 +7,4 @@ command! AnyFoldActivate call anyfold#init(1)
  
  " deprecated initialization using anyfold_activate variable
